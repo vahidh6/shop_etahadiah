@@ -1,204 +1,154 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Formik, Form } from 'formik';
-import * as Yup from 'yup';
-import { FaUser, FaLock, FaMobileAlt } from 'react-icons/fa';
-
-const BASE_URL = 'https://e549-103-216-160-90.ngrok-free.app'; // لینک Ngrok فعلی
-
-const LoginSchema = Yup.object().shape({
-  phoneNumber: Yup.string()
-    .required('شماره تماس الزامی است')
-    .matches(/^09[0-9]{9}$/, 'شماره تماس معتبر نیست'),
-  password: Yup.string()
-    .required('رمز عبور الزامی است')
-    .min(6, 'رمز عبور باید حداقل ۶ کاراکتر باشد'),
-});
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
+import './Login.css';
 
 const Login = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = async (values, { setSubmitting }) => {
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    
+    if (!username.trim() || !password.trim()) {
+      toast.error('نام کاربری و رمز عبور را وارد کنید');
+      return;
+    }
+
     setLoading(true);
-    setErrorMessage('');
 
     try {
-      const res = await fetch(`${BASE_URL}/api/auth/login`, {
+      // اتصال مستقیم به بک‌اند رندر شما
+      const API_URL = 'https://back-end-v2-qxa5.onrender.com/api/auth/login';
+      
+      console.log('📡 ارسال درخواست به:', API_URL);
+      console.log('👤 کاربر:', username);
+      
+      const response = await fetch(API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: values.phoneNumber, // backend expects "username"
-          password: values.password,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ 
+          phoneNumber: username, // یا username بسته به انتظار بک‌اند
+          password: password 
         }),
       });
 
-      const data = await res.json();
+      console.log('📊 وضعیت پاسخ:', response.status);
 
-      if (!data.success) {
-        setErrorMessage(data.message || 'خطا در ورود به سیستم');
-      } else {
-        // ذخیره توکن
-        localStorage.setItem('token', data.token);
-        navigate('/'); // بعد از ورود به داشبورد هدایت شود
+      const data = await response.json();
+      console.log('📦 پاسخ سرور:', data);
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'نام کاربری یا رمز عبور اشتباه است');
       }
-    } catch (err) {
-      console.error('Login error:', err);
-      setErrorMessage('خطا در اتصال به سرور');
+
+      // ذخیره اطلاعات
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('userRole', data.user.role || 'admin');
+      
+      toast.success('✅ ورود موفقیت‌آمیز');
+      
+      // هدایت به داشبورد
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 800);
+
+    } catch (error) {
+      console.error('❌ خطا:', error);
+      
+      // پیام خطای مناسب
+      let errorMessage = error.message;
+      if (error.message.includes('Failed to fetch')) {
+        errorMessage = 'سرور در دسترس نیست. لطفاً اتصال اینترنت را بررسی کنید';
+      } else if (error.message.includes('timed out')) {
+        errorMessage = 'سرور در حال راه‌اندازی است. لطفاً دوباره تلاش کنید';
+      }
+      
+      toast.error(`❌ ${errorMessage}`);
     } finally {
       setLoading(false);
-      setSubmitting(false);
     }
   };
 
+  // پر کردن خودکار برای تست
+  const fillAdmin = () => {
+    setUsername('admin');
+    setPassword('admin123');
+    toast.success('اطلاعات مدیر پر شد');
+  };
+
   return (
-    <div className="login-page">
-      <div className="login-container">
-        <div className="login-header">
-          <div className="logo">
-            <FaMobileAlt size={36} color="#4CAF50" />
-            <h1>سیستم مدیریت موبایل</h1>
-          </div>
-          <p>لطفاً اطلاعات خود را وارد کنید</p>
+    <div className="login-minimal">
+      <div className="login-box">
+        {/* لوگو */}
+        <div className="logo">
+          <div className="logo-icon">📱</div>
+          <h1>فروشگاه اتحادیه</h1>
         </div>
 
-        <Formik
-          initialValues={{ phoneNumber: '', password: '' }}
-          validationSchema={LoginSchema}
-          onSubmit={handleSubmit}
-        >
-          {({ errors, touched, handleChange, handleBlur, values }) => (
-            <Form className="login-form">
-              <div className="form-group">
-                <label>
-                  <FaUser /> شماره تماس
-                </label>
-                <input
-                  type="text"
-                  name="phoneNumber"
-                  placeholder="09xxxxxxxxx"
-                  value={values.phoneNumber}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  className={errors.phoneNumber && touched.phoneNumber ? 'error' : ''}
-                />
-                {errors.phoneNumber && touched.phoneNumber && (
-                  <div className="error-message">{errors.phoneNumber}</div>
-                )}
-              </div>
+        {/* فرم */}
+        <form onSubmit={handleLogin} className="login-form">
+          {/* فیلد نام کاربری */}
+          <div className="input-group">
+            <label>نام کاربری</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="admin"
+              disabled={loading}
+              autoComplete="username"
+            />
+          </div>
 
-              <div className="form-group">
-                <label>
-                  <FaLock /> رمز عبور
-                </label>
-                <input
-                  type="password"
-                  name="password"
-                  placeholder="رمز عبور"
-                  value={values.password}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  className={errors.password && touched.password ? 'error' : ''}
-                />
-                {errors.password && touched.password && (
-                  <div className="error-message">{errors.password}</div>
-                )}
-              </div>
+          {/* فیلد رمز عبور */}
+          <div className="input-group">
+            <label>رمز عبور</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="•••••••••"
+              disabled={loading}
+              autoComplete="current-password"
+            />
+          </div>
 
-              {errorMessage && <div className="server-error">{errorMessage}</div>}
+          {/* دکمه ورود */}
+          <button 
+            type="submit" 
+            className="login-btn"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <span className="spinner"></span>
+                در حال ورود...
+              </>
+            ) : 'ورود به سیستم'}
+          </button>
 
-              <button type="submit" className="login-btn" disabled={loading}>
-                {loading ? 'در حال ورود...' : 'ورود به سیستم'}
-              </button>
+          {/* دکمه تست */}
+          <button 
+            type="button" 
+            className="test-btn"
+            onClick={fillAdmin}
+          >
+            پر کردن خودکار (تست)
+          </button>
+        </form>
 
-              <div className="login-footer">
-                <p>
-                  دوکاندار جدید هستید؟ <Link to="/register">ثبت‌نام کنید</Link>
-                </p>
-              </div>
-            </Form>
-          )}
-        </Formik>
+        {/* وضعیت اتصال */}
+        <div className="connection-info">
+          <p>بک‌اند: <code>back-end-v2-qxa5.onrender.com</code></p>
+        </div>
       </div>
-
-      <style jsx>{`
-        .login-page {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-          background: #f5f5f5;
-        }
-        .login-container {
-          background: #fff;
-          padding: 30px;
-          border-radius: 8px;
-          box-shadow: 0 0 15px rgba(0,0,0,0.1);
-          width: 350px;
-        }
-        .logo {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 10px;
-        }
-        .login-header p {
-          margin-bottom: 20px;
-          color: #555;
-        }
-        .form-group {
-          margin-bottom: 15px;
-        }
-        .form-group label {
-          display: flex;
-          align-items: center;
-          gap: 5px;
-          font-weight: bold;
-          margin-bottom: 5px;
-        }
-        input {
-          width: 100%;
-          padding: 10px;
-          border-radius: 5px;
-          border: 1px solid #ccc;
-        }
-        input.error {
-          border-color: red;
-        }
-        .error-message {
-          color: red;
-          font-size: 0.9em;
-        }
-        .server-error {
-          margin-bottom: 10px;
-          color: red;
-          font-weight: bold;
-        }
-        .login-btn {
-          width: 100%;
-          padding: 10px;
-          background: #4CAF50;
-          color: #fff;
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-          font-size: 1em;
-        }
-        .login-btn:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-        }
-        .login-footer {
-          margin-top: 15px;
-          text-align: center;
-          font-size: 0.9em;
-        }
-        .login-footer a {
-          color: #4CAF50;
-          text-decoration: none;
-        }
-      `}</style>
     </div>
   );
 };
