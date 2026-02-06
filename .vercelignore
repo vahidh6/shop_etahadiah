@@ -1,0 +1,4 @@
+*
+!build/
+!now.json
+!vercel.json
