@@ -78,7 +78,7 @@ const Layout = ({ children }) => {
         boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
       }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '22px' }}>🏪 فروشگاه اتحادیه</h2>
+          <h2 style={{ margin: 0, fontSize: '22px' }}>🏪 کتابچه الکترونیکی اتحادیه مبایل فروشان ولایت هرات </h2>
           <small style={{ opacity: 0.8 }}>سیستم مدیریت خرید موبایل</small>
         </div>
         
