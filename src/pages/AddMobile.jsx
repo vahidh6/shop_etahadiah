@@ -12,11 +12,14 @@ const MobileSchema = Yup.object().shape({
     .matches(/^[0-9]{15}$/, 'IMEI باید ۱۵ رقم باشد'),
   brand: Yup.string().required('برند الزامی است'),
   sellerName: Yup.string().required('نام فروشنده الزامی است'),
-  fatherName: Yup.string().required('نام پدر الزامی است'),
+  sellerFatherName: Yup.string().required('نام پدر فروشنده الزامی است'),
   sellerPhone: Yup.string()
     .required('شماره تماس فروشنده الزامی است')
     .matches(/^(0|\+93)?(7[0-9]{8}|[2-8][0-9]{7})$/, 'شماره تماس معتبر نیست'),
-  address: Yup.string().required('آدرس الزامی است'),
+  sellerAddress: Yup.string(),
+  price: Yup.number()
+    .required('قیمت خرید الزامی است')
+    .min(0, 'قیمت نمی‌تواند منفی باشد'),
 });
 
 const AddMobile = () => {
@@ -24,7 +27,7 @@ const AddMobile = () => {
   const [uploading, setUploading] = useState(false);
   const [files, setFiles] = useState({
     sellerPhoto: null,
-    tazkiraPhoto: null,
+    idCardPhoto: null,
     thumbPhoto: null,
   });
 
@@ -46,15 +49,39 @@ const AddMobile = () => {
       // ایجاد FormData برای ارسال فایل‌ها
       const formData = new FormData();
       
-      // اضافه کردن مقادیر فرم
-      Object.keys(values).forEach(key => {
-        formData.append(key, values[key]);
-      });
+      // اضافه کردن مقادیر فرم مطابق اسکیمای backend
+      formData.append('imei1', values.imei1);
+      formData.append('imei2', values.imei2 || '');
+      formData.append('brand', values.brand);
+      formData.append('model', values.model || '');
+      formData.append('color', values.color || '');
+      formData.append('storage', values.storage || '');
+      formData.append('condition', values.condition || 'used');
+      formData.append('price', values.price.toString());
+      
+      // اطلاعات فروشنده
+      formData.append('sellerName', values.sellerName);
+      formData.append('sellerFatherName', values.sellerFatherName);
+      formData.append('sellerPhone', values.sellerPhone);
+      formData.append('sellerAddress', values.sellerAddress || '');
       
       // اضافه کردن فایل‌ها
       if (files.sellerPhoto) formData.append('sellerPhoto', files.sellerPhoto);
-      if (files.tazkiraPhoto) formData.append('tazkiraPhoto', files.tazkiraPhoto);
+      if (files.idCardPhoto) formData.append('idCardPhoto', files.idCardPhoto);
       if (files.thumbPhoto) formData.append('thumbPhoto', files.thumbPhoto);
+      
+      // یادداشت‌ها
+      formData.append('notes', values.notes || '');
+      
+      // نمایش داده‌های ارسالی برای دیباگ
+      console.log('📤 ارسال داده‌ها به سرور:');
+      for (let pair of formData.entries()) {
+        if (pair[1] instanceof File) {
+          console.log(`📁 ${pair[0]}: File - ${pair[1].name}, Size: ${pair[1].size} bytes`);
+        } else {
+          console.log(`📝 ${pair[0]}: ${pair[1]}`);
+        }
+      }
       
       // ارسال به API
       const token = localStorage.getItem('token');
@@ -62,19 +89,21 @@ const AddMobile = () => {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
-          // Note: Don't set Content-Type for FormData
         },
         body: formData
       });
       
+      console.log('📥 پاسخ سرور:', response.status, response.statusText);
+      
       const data = await response.json();
+      console.log('📊 داده پاسخ:', data);
       
       if (response.ok) {
         toast.success('✅ موبایل با موفقیت ثبت شد');
         resetForm();
         setFiles({
           sellerPhoto: null,
-          tazkiraPhoto: null,
+          idCardPhoto: null,
           thumbPhoto: null,
         });
         
@@ -374,7 +403,7 @@ const AddMobile = () => {
     );
   };
 
-  // آیکون‌های جایگزین (چون react-icons نصب نیست)
+  // آیکون‌های جایگزین
   const icons = {
     Mobile: () => <span style={styles.icon}>📱</span>,
     User: () => <span style={styles.icon}>👤</span>,
@@ -382,7 +411,8 @@ const AddMobile = () => {
     Phone: () => <span style={styles.icon}>📞</span>,
     MapMarker: () => <span style={styles.icon}>📍</span>,
     Camera: () => <span style={styles.icon}>📷</span>,
-    Upload: () => <span style={styles.icon}>⬆️</span>
+    Upload: () => <span style={styles.icon}>⬆️</span>,
+    Dollar: () => <span style={styles.icon}>💰</span>
   };
 
   return (
@@ -405,11 +435,16 @@ const AddMobile = () => {
             imei1: '',
             imei2: '',
             brand: '',
+            model: '',
+            color: '',
+            storage: '',
+            condition: 'used',
+            price: '',
             sellerName: '',
-            fatherName: '',
+            sellerFatherName: '',
             sellerPhone: '',
-            address: '',
-            additionalInfo: '',
+            sellerAddress: '',
+            notes: '',
           }}
           validationSchema={MobileSchema}
           onSubmit={handleSubmit}
@@ -479,6 +514,83 @@ const AddMobile = () => {
                     </ErrorMessage>
                   </div>
                 </div>
+
+                <div style={styles.formRow}>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>مدل (اختیاری)</label>
+                    <Field 
+                      type="text" 
+                      name="model" 
+                      placeholder="مدل موبایل"
+                      style={styles.input}
+                    />
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>رنگ (اختیاری)</label>
+                    <Field 
+                      type="text" 
+                      name="color" 
+                      placeholder="رنگ موبایل"
+                      style={styles.input}
+                    />
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>حافظه (اختیاری)</label>
+                    <Field 
+                      type="text" 
+                      name="storage" 
+                      placeholder="ظرفیت حافظه"
+                      style={styles.input}
+                    />
+                  </div>
+                </div>
+
+                <div style={styles.formRow}>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>وضعیت</label>
+                    <Field 
+                      as="select" 
+                      name="condition"
+                      style={styles.select}
+                    >
+                      <option value="used">📱 دست دوم</option>
+                      <option value="new">🆕 نو</option>
+                      <option value="refurbished">🔧 بازسازی شده</option>
+                    </Field>
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>
+                      <icons.Dollar />
+                      قیمت خرید *
+                    </label>
+                    <Field 
+                      type="number" 
+                      name="price" 
+                      placeholder="قیمت به افغانی"
+                      style={{
+                        ...styles.input,
+                        ...(errors.price && touched.price ? styles.inputError : {})
+                      }}
+                    />
+                    <ErrorMessage name="price">
+                      {msg => <div style={styles.errorText}>⚠️ {msg}</div>}
+                    </ErrorMessage>
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>یادداشت‌ها (اختیاری)</label>
+                    <Field 
+                      as="textarea" 
+                      name="notes" 
+                      rows="2"
+                      placeholder="توضیحات اضافی"
+                      style={styles.textarea}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* بخش اطلاعات فروشنده */}
@@ -506,23 +618,21 @@ const AddMobile = () => {
                   </div>
 
                   <div style={styles.formGroup}>
-                    <label style={styles.label}>نام پدر *</label>
+                    <label style={styles.label}>نام پدر فروشنده *</label>
                     <Field 
                       type="text" 
-                      name="fatherName" 
+                      name="sellerFatherName" 
                       placeholder="نام پدر فروشنده"
                       style={{
                         ...styles.input,
-                        ...(errors.fatherName && touched.fatherName ? styles.inputError : {})
+                        ...(errors.sellerFatherName && touched.sellerFatherName ? styles.inputError : {})
                       }}
                     />
-                    <ErrorMessage name="fatherName">
+                    <ErrorMessage name="sellerFatherName">
                       {msg => <div style={styles.errorText}>⚠️ {msg}</div>}
                     </ErrorMessage>
                   </div>
-                </div>
 
-                <div style={styles.formRow}>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>
                       <icons.Phone />
@@ -541,26 +651,20 @@ const AddMobile = () => {
                       {msg => <div style={styles.errorText}>⚠️ {msg}</div>}
                     </ErrorMessage>
                   </div>
+                </div>
 
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>
-                      <icons.MapMarker />
-                      آختصاصی *
-                    </label>
-                    <Field 
-                      as="textarea" 
-                      name="address" 
-                      rows="3"
-                      placeholder="آدرس کامل فروشنده"
-                      style={{
-                        ...styles.textarea,
-                        ...(errors.address && touched.address ? styles.inputError : {})
-                      }}
-                    />
-                    <ErrorMessage name="address">
-                      {msg => <div style={styles.errorText}>⚠️ {msg}</div>}
-                    </ErrorMessage>
-                  </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
+                    <icons.MapMarker />
+                    آدرس فروشنده (اختیاری)
+                  </label>
+                  <Field 
+                    as="textarea" 
+                    name="sellerAddress" 
+                    rows="3"
+                    placeholder="آدرس کامل فروشنده"
+                    style={styles.textarea}
+                  />
                 </div>
               </div>
 
@@ -579,29 +683,15 @@ const AddMobile = () => {
                   />
                   
                   <FileUpload 
-                    field="tazkiraPhoto"
+                    field="idCardPhoto"
                     label="عکس تذکره"
                     icon={<icons.IdCard />}
                   />
                   
                   <FileUpload 
                     field="thumbPhoto"
-                    label="عکس انگشت شست"
+                    label="عکس نشان شست"
                     icon={<icons.User />}
-                  />
-                </div>
-              </div>
-
-              {/* اطلاعات اضافی */}
-              <div style={styles.formSection}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>اطلاعات اضافی</label>
-                  <Field 
-                    as="textarea" 
-                    name="additionalInfo" 
-                    rows="4"
-                    placeholder="یادداشت‌ها، توضیحات اضافی، وضعیت موبایل و ..."
-                    style={styles.textarea}
                   />
                 </div>
               </div>
