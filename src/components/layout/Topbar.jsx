@@ -1,40 +1,29 @@
 import React from 'react';
-import { FaBell, FaSearch, FaUserCircle } from 'react-icons/fa';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import Loading from '../common/Loading';
 
-const Topbar = () => {
-  const { user } = useAuth();
+const ProtectedRoute = ({ children, adminOnly = false, shopOwnerOnly = false }) => {
+  const { isAuthenticated, loading, isAdmin, isShopOwner } = useAuth();
+  const location = useLocation();
 
-  return (
-    <div className="topbar">
-      <div className="topbar-left">
-        <div className="search-bar">
-          <FaSearch className="search-icon" />
-          <input 
-            type="text" 
-            placeholder="جستجو در موبایل‌ها..." 
-          />
-        </div>
-      </div>
+  if (loading) {
+    return <Loading fullScreen />;
+  }
 
-      <div className="topbar-right">
-        <div className="notifications">
-          <FaBell />
-          <span className="badge">3</span>
-        </div>
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
 
-        <div className="user-profile">
-          <FaUserCircle className="avatar" />
-          <div className="user-info">
-            <span className="user-name">{user?.name || 'کاربر'}</span>
-            <span className="user-role">
-              {user?.role === 'admin' ? 'مدیر' : 'دوکاندار'}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  if (adminOnly && !isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (shopOwnerOnly && !isShopOwner) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
 };
 
-export default Topbar;
+export default ProtectedRoute;
