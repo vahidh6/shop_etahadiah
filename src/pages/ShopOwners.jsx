@@ -1,83 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 
 const ShopOwners = () => {
   const [shopOwners, setShopOwners] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [endpoint, setEndpoint] = useState('');
 
   const API_BASE_URL = 'https://back-end-v2-qxa5.onrender.com';
 
-  useEffect(() => {
-    fetchShopOwners();
-  }, []);
-
-  const fetchShopOwners = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        setError('لطفاً ابتدا وارد سیستم شوید');
-        toast.error('لطفاً ابتدا وارد سیستم شوید');
-        return;
-      }
-
-      // endpointهای فروشگاه
-      const shopEndpoints = [
-        '/api/admin/shops',
-        '/api/shops',
-        '/api/admin/users',
-        '/api/users'
-      ];
-
-      let shopsData = null;
-      let foundEndpoint = '';
-
-      // تست endpointها
-      for (const ep of shopEndpoints) {
-        try {
-          const response = await fetch(`${API_BASE_URL}${ep}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          
-          if (response.ok) {
-            shopsData = await response.json();
-            foundEndpoint = ep;
-            console.log(`✅ ${ep} - داده دریافتی:`, shopsData);
-            break;
-          }
-        } catch (err) {
-          console.log(`${ep} خطا: ${err.message}`);
-        }
-      }
-
-      if (!shopsData) {
-        // اگر هیچ endpointی کار نکرد، از خریدها استخراج کن
-        await extractShopsFromPurchases(token);
-        return;
-      }
-
-      setEndpoint(foundEndpoint);
-      localStorage.setItem('shop_endpoint', foundEndpoint);
-
-      // پردازش داده‌ها بر اساس ساختارهای مختلف
-      processShopData(shopsData);
-      
-    } catch (error) {
-      console.error('خطا در دریافت فروشگاه‌ها:', error);
-      setError('خطا در اتصال به سرور');
-      toast.error('خطا در دریافت اطلاعات');
-      setShopOwners([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // استخراج فروشگاه‌ها از داده‌های خرید
-  const extractShopsFromPurchases = async (token) => {
+  // تابع استخراج فروشگاه‌ها از خریدها
+  const extractShopsFromPurchases = useCallback(async (token) => {
     try {
       console.log('🔍 استخراج فروشگاه‌ها از خریدها...');
       
@@ -107,7 +39,7 @@ const ShopOwners = () => {
       }
 
       if (!purchasesData || !Array.isArray(purchasesData)) {
-        setError('داده‌ای برای استخراج فروشگاه‌ها یافت نشد');
+        toast.error('داده‌ای برای استخراج فروشگاه‌ها یافت نشد');
         setShopOwners([]);
         return;
       }
@@ -126,19 +58,16 @@ const ShopOwners = () => {
               phone: purchase.sellerPhone || '—',
               status: 'active',
               address: purchase.sellerAddress || '',
-              // اطلاعات اضافی از خرید
               totalPurchases: 1,
               totalValue: purchase.price || 0
             });
           } else {
-            // اگر قبلاً اضافه شده، آمار را به‌روز کن
             const existingShop = shopsMap.get(shopKey);
             existingShop.totalPurchases += 1;
             existingShop.totalValue += purchase.price || 0;
           }
         }
         
-        // همچنین بر اساس فروشنده
         if (purchase.sellerName && purchase.sellerPhone) {
           const sellerKey = `${purchase.sellerName}-${purchase.sellerPhone}`;
           if (!shopsMap.has(sellerKey)) {
@@ -165,31 +94,26 @@ const ShopOwners = () => {
       
     } catch (error) {
       console.error('خطا در استخراج فروشگاه‌ها:', error);
-      setError('خطا در پردازش داده‌ها');
+      toast.error('خطا در پردازش داده‌ها');
       setShopOwners([]);
     }
-  };
+  }, []);
 
-  // پردازش داده‌های فروشگاه با ساختارهای مختلف
-  const processShopData = (data) => {
+  // تابع پردازش داده‌های فروشگاه
+  const processShopData = useCallback((data) => {
     console.log('🔧 پردازش داده‌های فروشگاه:', data);
     
     let processedShops = [];
     
-    // اگر داده آرایه است
     if (Array.isArray(data)) {
       if (data.length === 0) {
-        setError('لیست فروشگاه‌ها خالی است');
         toast.info('هیچ فروشگاهی ثبت نشده است');
         setShopOwners([]);
         return;
       }
       
-      // پردازش هر آیتم در آرایه
       processedShops = data.map(item => {
-        // تشخیص ساختار داده
         if (item.name || item.shopName) {
-          // ساختار استاندارد فروشگاه
           return {
             _id: item._id || item.id || Math.random().toString(36).substr(2, 9),
             name: item.name || item.sellerName || item.shopName || 'نامشخص',
@@ -202,7 +126,6 @@ const ShopOwners = () => {
             updatedAt: item.updatedAt || ''
           };
         } else if (item.username || item.email) {
-          // ممکن است کاربر باشد نه فروشگاه
           return {
             _id: item._id || item.id,
             name: item.fullName || item.username || 'کاربر',
@@ -213,20 +136,17 @@ const ShopOwners = () => {
             role: item.role || 'user'
           };
         } else {
-          // ساختار ناشناخته
           return {
             _id: item._id || item.id || Math.random().toString(36).substr(2, 9),
             name: 'نامشخص',
             shop: 'فروشگاه',
             phone: '—',
-            status: 'active',
-            rawData: item // ذخیره داده خام برای دیباگ
+            status: 'active'
           };
         }
       });
       
     } else if (data && typeof data === 'object') {
-      // اگر داده object است
       const possibleArrayKeys = ['shops', 'users', 'data', 'list', 'results', 'items'];
       
       for (const key of possibleArrayKeys) {
@@ -243,7 +163,6 @@ const ShopOwners = () => {
         }
       }
       
-      // اگر آرایه پیدا نشد و object تک است
       if (processedShops.length === 0) {
         processedShops = [{
           _id: data._id || data.id,
@@ -255,13 +174,11 @@ const ShopOwners = () => {
       }
     }
     
-    // فیلتر کردن موارد نامعتبر
     const validShops = processedShops.filter(shop => 
       shop && (shop.name !== 'نامشخص' || shop.phone !== '—')
     );
     
     if (validShops.length === 0) {
-      setError('داده‌های دریافتی معتبر نیستند');
       toast.error('فرمت داده‌ها قابل پردازش نیست');
     }
     
@@ -271,7 +188,68 @@ const ShopOwners = () => {
     if (validShops.length > 0) {
       toast.success(`${validShops.length} فروشگاه بارگذاری شد`);
     }
-  };
+  }, []);
+
+  // تابع اصلی دریافت فروشگاه‌ها
+  const fetchShopOwners = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        toast.error('لطفاً ابتدا وارد سیستم شوید');
+        return;
+      }
+
+      const shopEndpoints = [
+        '/api/admin/shops',
+        '/api/shops',
+        '/api/admin/users',
+        '/api/users'
+      ];
+
+      let shopsData = null;
+      let foundEndpoint = '';
+
+      for (const ep of shopEndpoints) {
+        try {
+          const response = await fetch(`${API_BASE_URL}${ep}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          if (response.ok) {
+            shopsData = await response.json();
+            foundEndpoint = ep;
+            console.log(`✅ ${ep} - داده دریافتی:`, shopsData);
+            break;
+          }
+        } catch (err) {
+          console.log(`${ep} خطا: ${err.message}`);
+        }
+      }
+
+      if (!shopsData) {
+        await extractShopsFromPurchases(token);
+        return;
+      }
+
+      setEndpoint(foundEndpoint);
+      localStorage.setItem('shop_endpoint', foundEndpoint);
+
+      processShopData(shopsData);
+      
+    } catch (error) {
+      console.error('خطا در دریافت فروشگاه‌ها:', error);
+      toast.error('خطا در دریافت اطلاعات');
+      setShopOwners([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [extractShopsFromPurchases, processShopData]);
+
+  useEffect(() => {
+    fetchShopOwners();
+  }, [fetchShopOwners]);
 
   const handleAddShop = () => {
     toast.info('این قابلیت به زودی اضافه می‌شود');
@@ -305,7 +283,6 @@ const ShopOwners = () => {
             throw new Error('حذف از سرور ناموفق بود');
           }
         } else {
-          // فقط از state حذف کن
           setShopOwners(prev => prev.filter(s => s._id !== id));
           toast.success(`فروشگاه "${shop.name}" از لیست حذف شد`);
         }
@@ -346,7 +323,6 @@ const ShopOwners = () => {
     <div style={{ direction: 'rtl' }}>
       <h1 style={{ color: '#1e293b', marginBottom: '30px' }}>🏪 مدیریت فروشگاه‌ها</h1>
       
-      {/* وضعیت اتصال */}
       <div style={{
         background: '#d1fae5',
         border: '1px solid #10b981',
@@ -375,26 +351,23 @@ const ShopOwners = () => {
             </span>
           </div>
           
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button 
-              onClick={viewRawData}
-              style={{
-                padding: '4px 8px',
-                background: 'transparent',
-                border: '1px solid #cbd5e1',
-                borderRadius: '4px',
-                fontSize: '0.8em',
-                color: '#64748b',
-                cursor: 'pointer'
-              }}
-            >
-              👁️ نمایش داده‌ها
-            </button>
-          </div>
+          <button 
+            onClick={viewRawData}
+            style={{
+              padding: '4px 8px',
+              background: 'transparent',
+              border: '1px solid #cbd5e1',
+              borderRadius: '4px',
+              fontSize: '0.8em',
+              color: '#64748b',
+              cursor: 'pointer'
+            }}
+          >
+            👁️ نمایش داده‌ها
+          </button>
         </div>
       </div>
       
-      {/* Actions */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <button
           onClick={handleAddShop}
@@ -437,7 +410,6 @@ const ShopOwners = () => {
         </div>
       </div>
       
-      {/* Loading */}
       {loading ? (
         <div style={{ 
           padding: '60px 20px', 
@@ -461,7 +433,6 @@ const ShopOwners = () => {
           `}</style>
         </div>
       ) : (
-        /* Content */
         <div style={{
           background: 'white',
           borderRadius: '12px',
@@ -582,11 +553,6 @@ const ShopOwners = () => {
                       </td>
                       <td style={{ padding: '15px', color: '#1e293b', fontWeight: '500' }}>
                         {owner.name}
-                        {owner.rawData && (
-                          <div style={{ fontSize: '0.8em', color: '#94a3b8', marginTop: '4px' }}>
-                            (داده خام موجود)
-                          </div>
-                        )}
                       </td>
                       <td style={{ padding: '15px', color: '#1e293b' }}>
                         {owner.shop}
@@ -652,7 +618,6 @@ const ShopOwners = () => {
                 </tbody>
               </table>
               
-              {/* اطلاعات اضافی */}
               {shopOwners.some(shop => shop.address || shop.createdAt) && (
                 <div style={{
                   marginTop: '20px',
