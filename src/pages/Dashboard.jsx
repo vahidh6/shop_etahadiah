@@ -325,7 +325,7 @@ const Dashboard = () => {
                     </h4>
                     <p style={styles.purchaseDetails}>
                       {purchase.sellerName || 'نامشخص'} | 
-                      قیمت: {purchase.price?.toLocaleString() || '۰'} تومان
+                      قیمت: {purchase.price?.toLocaleString() || '۰'} افغانی
                     </p>
                   </div>
                   <div style={{ color: '#64748b', fontSize: '14px' }}>
