@@ -168,7 +168,7 @@ const Mobiles = () => {
 
   const formatPrice = (price) => {
     if (!price && price !== 0) return 'نامشخص';
-    return price.toLocaleString('fa-IR') + ' تومان';
+    return price.toLocaleString('fa-IR') + ' افغانی';
   };
 
   const getStatusBadge = (status) => {
